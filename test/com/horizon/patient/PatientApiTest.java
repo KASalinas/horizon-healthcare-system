@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,7 +41,8 @@ class PatientApiTest {
 
         mockMvc.perform(get("/api/patients"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(1));
 
         mockMvc.perform(put("/api/patients/MRN-1001")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -51,6 +53,28 @@ class PatientApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("Taylor Rivera"))
                 .andExpect(jsonPath("$.email").value("taylor.rivera@example.test"));
+    }
+
+    @Test
+    void paginatesSortsAndPartiallyUpdatesPatients() throws Exception {
+        registerPatient("MRN-1002", "Zulu Patient", "1990-06-20", "zulu@example.test")
+                .andExpect(status().isCreated());
+        registerPatient("MRN-1001", "Alpha Patient", "1992-04-10", "alpha@example.test")
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/patients?page=0&size=1&sort=fullName&direction=asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].fullName").value("Alpha Patient"))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        mockMvc.perform(patch("/api/patients/MRN-1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"updated@example.test\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Alpha Patient"))
+                .andExpect(jsonPath("$.email").value("updated@example.test"))
+                .andExpect(jsonPath("$.updatedAt").exists());
     }
 
     @Test
@@ -72,6 +96,10 @@ class PatientApiTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].clinician").value("Dr. Patel"))
                 .andExpect(jsonPath("$[0].notes").value("Follow-up recommended"));
+
+        mockMvc.perform(get("/api/patients/MRN-1001/encounters/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("Urgent care"));
     }
 
     @Test
@@ -98,6 +126,32 @@ class PatientApiTest {
         mockMvc.perform(get("/api/patients/UNKNOWN"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("No patient found with MRN UNKNOWN"));
+    }
+
+    @Test
+    void publishesOpenApiDocumentation() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("Horizon Healthcare API"))
+                .andExpect(jsonPath("$.info.version").value("0.3.0"));
+    }
+
+    @Test
+    void rejectsUnsupportedPaginationAndEmptyPatch() throws Exception {
+        registerPatient("MRN-1001", "Taylor Morgan", "1990-06-20", "taylor@example.test")
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/patients?size=101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+        mockMvc.perform(get("/api/patients?sort=email"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Unsupported patient sort field: email"));
+        mockMvc.perform(patch("/api/patients/MRN-1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
     }
 
     private org.springframework.test.web.servlet.ResultActions registerPatient(

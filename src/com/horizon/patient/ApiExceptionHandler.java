@@ -6,6 +6,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import jakarta.validation.ConstraintViolationException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -15,6 +16,11 @@ import java.util.Map;
 public class ApiExceptionHandler {
     @ExceptionHandler(PatientNotFoundException.class)
     ResponseEntity<Map<String, Object>> notFound(PatientNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler(EncounterNotFoundException.class)
+    ResponseEntity<Map<String, Object>> encounterNotFound(EncounterNotFoundException exception) {
         return error(HttpStatus.NOT_FOUND, exception.getMessage());
     }
 
@@ -35,6 +41,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<Map<String, Object>> unreadable(HttpMessageNotReadableException exception) {
         return error(HttpStatus.BAD_REQUEST, "Request contains malformed or invalid values");
+    }
+
+    @ExceptionHandler({IllegalArgumentException.class, ConstraintViolationException.class})
+    ResponseEntity<Map<String, Object>> badRequest(RuntimeException exception) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {

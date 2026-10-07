@@ -4,9 +4,11 @@ import com.horizon.patient.api.EncounterRequest;
 import com.horizon.patient.api.EncounterResponse;
 import com.horizon.patient.api.PatientRequest;
 import com.horizon.patient.api.PatientResponse;
+import com.horizon.patient.api.PatientPatchRequest;
 import com.horizon.patient.api.PatientUpdateRequest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,17 +43,34 @@ public class PatientService {
         return PatientResponse.from(findEntity(medicalRecordNumber));
     }
 
-    public List<PatientResponse> findAll() {
-        return patientRepository.findAll(Sort.by("id")).stream()
-                .map(PatientResponse::from)
-                .toList();
+    public Page<PatientResponse> findAll(Pageable pageable) {
+        return patientRepository.findAll(pageable).map(PatientResponse::from);
     }
 
     @Transactional
     public PatientResponse update(String medicalRecordNumber, PatientUpdateRequest request) {
         Patient patient = findEntity(medicalRecordNumber);
         patient.update(request.fullName().trim(), request.dateOfBirth(), request.email().trim());
-        return PatientResponse.from(patient);
+        return PatientResponse.from(patientRepository.saveAndFlush(patient));
+    }
+
+    @Transactional
+    public PatientResponse patch(String medicalRecordNumber, PatientPatchRequest request) {
+        if (request.fullName() == null && request.dateOfBirth() == null && request.email() == null) {
+            throw new IllegalArgumentException("At least one patient field must be provided");
+        }
+
+        Patient patient = findEntity(medicalRecordNumber);
+        String fullName = request.fullName() == null
+                ? patient.getFullName() : request.fullName().trim();
+        String email = request.email() == null ? patient.getEmail() : request.email().trim();
+        if (fullName.isBlank() || email.isBlank()) {
+            throw new IllegalArgumentException("Updated text fields cannot be blank");
+        }
+        patient.update(fullName,
+                request.dateOfBirth() == null ? patient.getDateOfBirth() : request.dateOfBirth(),
+                email);
+        return PatientResponse.from(patientRepository.saveAndFlush(patient));
     }
 
     @Transactional
@@ -68,6 +87,16 @@ public class PatientService {
         return findEntity(medicalRecordNumber).getEncounters().stream()
                 .map(EncounterResponse::from)
                 .toList();
+    }
+
+    public EncounterResponse findEncounter(String medicalRecordNumber, long encounterId) {
+        Patient patient = findEntity(medicalRecordNumber);
+        return patient.getEncounters().stream()
+                .filter(encounter -> encounter.getId().equals(encounterId))
+                .findFirst()
+                .map(EncounterResponse::from)
+                .orElseThrow(() -> new EncounterNotFoundException(
+                        patient.getMedicalRecordNumber(), encounterId));
     }
 
     private Patient findEntity(String medicalRecordNumber) {
