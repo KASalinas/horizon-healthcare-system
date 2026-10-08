@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Horizon patient management">
+    <title>Horizon · Patient management</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<header class="site-header">
+    <a class="brand" href="#/patients" aria-label="Horizon patient management home">
+        <span class="brand-name">Horizon</span>
+        <span class="brand-subtitle">Patient management</span>
+    </a>
+    <nav aria-label="Primary navigation">
+        <a href="#/patients" data-nav="patients">Patients</a>
+        <a href="#/register" data-nav="register">Register</a>
+        <a href="/docs" target="_blank" rel="noopener">API docs <span aria-hidden="true">↗</span></a>
+    </nav>
+</header>
+
+<main id="main-content" tabindex="-1">
+    <div id="app" aria-live="polite"></div>
+</main>
+
+<footer>Horizon <span aria-hidden="true">·</span> Patient workspace</footer>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
